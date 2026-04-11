@@ -9,11 +9,22 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.session.ConcurrentSessionFilter;
+import ru.phestrix.entitlementservice.security.ApiAuthorizeProcessingFilter;
+import ru.phestrix.entitlementservice.service.EntitlementTransformationHandler;
+
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 @Configuration
 @RequiredArgsConstructor
 @Order(1)
 public class SecurityConfiguration {
+    private static final String ENTITLEMENT_ROLES_DOMAIN = "entitlements";
+
+    private final EntitlementTransformationHandler entitlementTransformationHandler;
 
     @Bean
     public WebSecurityCustomizer webSecurityCustomizer() {
@@ -31,7 +42,21 @@ public class SecurityConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.requestMatchers("/v1/**").permitAll()
                         .anyRequest().authenticated())
-        //TODO: Add custom authentication and authorization filters here
+                .addFilterAfter(
+                        new ApiAuthorizeProcessingFilter(
+                                entitlementTransformationHandler::convertSessionIdToEntitlements,
+                                request -> {
+                                    Map<String, String> headers = new HashMap<>();
+                                    Enumeration<String> headerNames = request.getHeaderNames();
+                                    while (headerNames.hasMoreElements()) {
+                                        String name = headerNames.nextElement();
+                                        headers.put(name, request.getHeader(name));
+                                    }
+                                    return headers;
+                                },
+                                Set.of(ENTITLEMENT_ROLES_DOMAIN)
+                        ), ConcurrentSessionFilter.class
+                )
         ;
 
 

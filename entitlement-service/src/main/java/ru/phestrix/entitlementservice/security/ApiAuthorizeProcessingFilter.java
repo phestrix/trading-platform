@@ -1,21 +1,25 @@
 package ru.phestrix.entitlementservice.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.filter.OncePerRequestFilter;
-import ru.phestrix.entitlementservice.service.EntitlementTransformationHandler;
-import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
+@RequiredArgsConstructor
 public class ApiAuthorizeProcessingFilter extends OncePerRequestFilter {
     private static final String SESSION_ID_HEADER = "X-Session-Id";
     private static final String ENTITLEMENTS_HEADER = "X-Entitlements";
-    private EntitlementTransformationHandler entitlementHandler;
+    private final Function<String, Map<String, Set<String>>> entitlementProvider;
+    private final Function<HttpServletRequest, Map<String, String>> headersExtractor;
+    private final Set<String> allowedRoles;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -25,8 +29,7 @@ public class ApiAuthorizeProcessingFilter extends OncePerRequestFilter {
         try {
             String sessionId = extractAndValidateSessionId(request);
 
-            Map<String, Set<String>> entitlements =
-                    entitlementHandler.convertSessionIdToEntitlements(sessionId);
+            Map<String, Set<String>> entitlements = entitlementProvider.apply(sessionId);
 
             enrichResponseWithEntitlements(response, entitlements);
 
@@ -48,7 +51,7 @@ public class ApiAuthorizeProcessingFilter extends OncePerRequestFilter {
         return sessionId;
     }
 
-    private void enrichResponseWithEntitlements(HttpServletResponse response, Map<String, Set<String>> entitlements) {
+    private void enrichResponseWithEntitlements(HttpServletResponse response, Map<String, Set<String>> entitlements) throws IOException {
         String entitlementsJson = new ObjectMapper().writeValueAsString(entitlements);
         response.setHeader(ENTITLEMENTS_HEADER, entitlementsJson);
         response.setHeader("X-Content-Type-Options", "nosniff");

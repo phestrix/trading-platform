@@ -19,7 +19,7 @@ public class RedisConfiguration {
         RedisTemplate<String, Map<String, Set<String>>> template = new RedisTemplate<>();
         template.setConnectionFactory(factory);
         template.setKeySerializer(new StringRedisSerializer());
-        template.setKeySerializer(new GenericJacksonJsonRedisSerializer(new ObjectMapper()));
+        template.setValueSerializer(new GenericJacksonJsonRedisSerializer(new ObjectMapper()));
         return template;
     }
 }
